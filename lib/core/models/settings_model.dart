@@ -12,6 +12,7 @@ class HydrioSettings {
   final bool silentReminders;
   final String exportEmail;
   final String theme; // "system", "light", "dark"
+  final bool onboardingComplete;
 
   const HydrioSettings({
     required this.gender,
@@ -27,6 +28,7 @@ class HydrioSettings {
     required this.silentReminders,
     required this.exportEmail,
     required this.theme,
+    required this.onboardingComplete,
   });
 
   factory HydrioSettings.defaultSettings() {
@@ -44,6 +46,7 @@ class HydrioSettings {
       silentReminders: false,
       exportEmail: '',
       theme: 'system',
+      onboardingComplete: false,
     );
   }
 
@@ -61,6 +64,7 @@ class HydrioSettings {
     bool? silentReminders,
     String? exportEmail,
     String? theme,
+    bool? onboardingComplete,
   }) {
     return HydrioSettings(
       gender: gender ?? this.gender,
@@ -76,6 +80,7 @@ class HydrioSettings {
       silentReminders: silentReminders ?? this.silentReminders,
       exportEmail: exportEmail ?? this.exportEmail,
       theme: theme ?? this.theme,
+      onboardingComplete: onboardingComplete ?? this.onboardingComplete,
     );
   }
 
@@ -94,6 +99,7 @@ class HydrioSettings {
       'silent_reminders': silentReminders ? 1 : 0,
       'export_email': exportEmail,
       'theme': theme,
+      'onboarding_complete': onboardingComplete ? 1 : 0,
     };
   }
 
@@ -118,6 +124,9 @@ class HydrioSettings {
           : (map['silent_reminders'] as bool? ?? false),
       exportEmail: map['export_email'] as String? ?? '',
       theme: map['theme'] as String? ?? 'system',
+      onboardingComplete: (map['onboarding_complete'] is int)
+          ? (map['onboarding_complete'] as int) == 1
+          : (map['onboarding_complete'] as bool? ?? false),
     );
   }
 }

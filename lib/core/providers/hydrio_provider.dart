@@ -57,6 +57,7 @@ class HydrioProvider with ChangeNotifier {
       final silentReminders = _prefs.getBool('silent_reminders') ?? false;
       final exportEmail = _prefs.getString('export_email') ?? '';
       final theme = _prefs.getString('theme') ?? 'system';
+      final onboardingComplete = _prefs.getBool('onboarding_complete') ?? false;
 
       _settings = HydrioSettings(
         gender: gender,
@@ -72,6 +73,7 @@ class HydrioProvider with ChangeNotifier {
         silentReminders: silentReminders,
         exportEmail: exportEmail,
         theme: theme,
+        onboardingComplete: onboardingComplete,
       );
       notifyListeners();
     } catch (e) {
@@ -99,12 +101,20 @@ class HydrioProvider with ChangeNotifier {
     await _prefs.setBool('silent_reminders', _settings.silentReminders);
     await _prefs.setString('export_email', _settings.exportEmail);
     await _prefs.setString('theme', _settings.theme);
+    await _prefs.setBool('onboarding_complete', _settings.onboardingComplete);
 
     // Whenever settings are updated, recalculate/re-schedule notifications
     await NotificationService.instance.scheduleWindowReminders(_settings);
 
     // Also update today's daily target in database if it changed
     await _syncTodaySummary();
+  }
+
+  /// Sets onboarding completion status to true and persists it.
+  Future<void> completeOnboarding() async {
+    _settings = _settings.copyWith(onboardingComplete: true);
+    notifyListeners();
+    await _prefs.setBool('onboarding_complete', true);
   }
 
   /// Calculates dynamic daily water target if manual override is disabled.
