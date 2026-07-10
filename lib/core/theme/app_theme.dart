@@ -10,14 +10,21 @@ import 'app_colors.dart';
 /// - Rounded corners 12–16dp for an approachable feel.
 /// - Text scales with system font-scale / Dynamic Type (no hardcoded caps
 ///   on textScaleFactor).
+import '../providers/hydrio_provider.dart';
+
 class AppTheme {
   AppTheme._();
 
   static const double _radius = 16;
   static const double _buttonHeight = 52;
 
-  static ThemeData get light => _build(Brightness.light, AppPalette.light);
-  static ThemeData get dark => _build(Brightness.dark, AppPalette.dark);
+  static ThemeData get light => build(Brightness.light, WeeklyHydrationLevel.mid);
+  static ThemeData get dark => build(Brightness.dark, WeeklyHydrationLevel.mid);
+
+  static ThemeData build(Brightness brightness, WeeklyHydrationLevel level) {
+    final palette = AppPalette.resolve(brightness, level);
+    return _build(brightness, palette);
+  }
 
   static ThemeData _build(Brightness brightness, AppPalette palette) {
     final base = ThemeData(
@@ -37,6 +44,7 @@ class AppTheme {
         onError: Colors.white,
         surface: palette.surface,
         onSurface: palette.ink,
+        primaryContainer: palette.primaryTint,
       ),
       dividerColor: palette.divider,
     );

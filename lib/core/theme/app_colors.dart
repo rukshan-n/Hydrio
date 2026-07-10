@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/hydrio_provider.dart';
 
 /// Hydrio color tokens — light and dark variants.
 ///
@@ -61,7 +63,19 @@ class AppPalette {
     required this.divider,
   });
 
-  static const light = AppPalette(
+  static const lightLow = AppPalette(
+    primary: AppColors.primaryLight,
+    primaryTint: AppColors.primaryTintLight,
+    success: AppColors.successLight,
+    ink: Color(0xFF2A1B0E),
+    muted: Color(0xFF756455),
+    surface: Color(0xFFD7C9BA),
+    panel: Color(0xFFC5B4A4),
+    danger: AppColors.dangerLight,
+    divider: Color(0xFFBCAEA0),
+  );
+
+  static const lightMid = AppPalette(
     primary: AppColors.primaryLight,
     primaryTint: AppColors.primaryTintLight,
     success: AppColors.successLight,
@@ -73,7 +87,31 @@ class AppPalette {
     divider: AppColors.dividerLight,
   );
 
-  static const dark = AppPalette(
+  static const lightHigh = AppPalette(
+    primary: AppColors.primaryLight,
+    primaryTint: AppColors.primaryTintLight,
+    success: AppColors.successLight,
+    ink: Color(0xFF0C2B40),
+    muted: Color(0xFF4F738A),
+    surface: Color(0xFFD9ECFA),
+    panel: Color(0xFFC1DFFA),
+    danger: AppColors.dangerLight,
+    divider: Color(0xFFADD3F7),
+  );
+
+  static const darkLow = AppPalette(
+    primary: AppColors.primaryDark,
+    primaryTint: AppColors.primaryTintDark,
+    success: AppColors.successDark,
+    ink: Color(0xFFF2E9E1),
+    muted: Color(0xFFA18E81),
+    surface: Color(0xFF221711),
+    panel: Color(0xFF33231B),
+    danger: AppColors.dangerDark,
+    divider: Color(0xFF422E23),
+  );
+
+  static const darkMid = AppPalette(
     primary: AppColors.primaryDark,
     primaryTint: AppColors.primaryTintDark,
     success: AppColors.successDark,
@@ -85,7 +123,50 @@ class AppPalette {
     divider: AppColors.dividerDark,
   );
 
+  static const darkHigh = AppPalette(
+    primary: AppColors.primaryDark,
+    primaryTint: AppColors.primaryTintDark,
+    success: AppColors.successDark,
+    ink: Color(0xFFE1F0FC),
+    muted: Color(0xFF92B1C9),
+    surface: Color(0xFF0C1824),
+    panel: Color(0xFF182E44),
+    danger: AppColors.dangerDark,
+    divider: Color(0xFF234260),
+  );
+
+  static const light = lightMid;
+  static const dark = darkMid;
+
+  static AppPalette resolve(Brightness brightness, WeeklyHydrationLevel level) {
+    if (brightness == Brightness.dark) {
+      switch (level) {
+        case WeeklyHydrationLevel.low:
+          return darkLow;
+        case WeeklyHydrationLevel.mid:
+          return darkMid;
+        case WeeklyHydrationLevel.high:
+          return darkHigh;
+      }
+    } else {
+      switch (level) {
+        case WeeklyHydrationLevel.low:
+          return lightLow;
+        case WeeklyHydrationLevel.mid:
+          return lightMid;
+        case WeeklyHydrationLevel.high:
+          return lightHigh;
+      }
+    }
+  }
+
   static AppPalette of(BuildContext context) {
-    return Theme.of(context).brightness == Brightness.dark ? dark : light;
+    final brightness = Theme.of(context).brightness;
+    try {
+      final provider = Provider.of<HydrioProvider>(context);
+      return resolve(brightness, provider.weeklyHydrationLevel);
+    } catch (_) {
+      return brightness == Brightness.dark ? darkMid : lightMid;
+    }
   }
 }

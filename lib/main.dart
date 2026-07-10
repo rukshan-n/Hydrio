@@ -43,6 +43,10 @@ class HydrioApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // Choose theme dynamically based on setting
     final themeSetting = context.select<HydrioProvider, String>((p) => p.settings.theme);
+    final onboardingComplete = context.select<HydrioProvider, bool>((p) => p.settings.onboardingComplete);
+    final hydrationLevel = onboardingComplete
+        ? context.select<HydrioProvider, WeeklyHydrationLevel>((p) => p.weeklyHydrationLevel)
+        : WeeklyHydrationLevel.mid;
     
     ThemeMode themeMode;
     switch (themeSetting.toLowerCase()) {
@@ -58,9 +62,11 @@ class HydrioApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'Hydrio',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: AppTheme.build(Brightness.light, hydrationLevel),
+      darkTheme: AppTheme.build(Brightness.dark, hydrationLevel),
       themeMode: themeMode,
+      themeAnimationDuration: const Duration(milliseconds: 600),
+      themeAnimationCurve: Curves.easeInOut,
       home: const SplashScreen(),
     );
   }
