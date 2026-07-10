@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/providers/hydrio_provider.dart';
-import 'core/theme/theme.dart';
+import 'core/theme/app_theme.dart';
 import 'ui/screens/welcome_screen.dart';
 import 'ui/screens/home_screen.dart';
 
@@ -57,8 +57,8 @@ class HydrioApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'Hydrio',
-      theme: HydrioTheme.lightTheme,
-      darkTheme: HydrioTheme.darkTheme,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       themeMode: themeMode,
       home: const HydrioGateway(),
     );
