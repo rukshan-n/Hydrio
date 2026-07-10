@@ -10,7 +10,7 @@ void main() {
   sqfliteFfiInit();
 
   group('Hydrio Navigation & Widget Tests', () {
-    testWidgets('Hydrio placeholder screen renders core text elements when onboarding complete', (WidgetTester tester) async {
+    testWidgets('Hydrio Today screen renders core elements when onboarding complete', (WidgetTester tester) async {
       print('WIDGET TEST 1: Starting in runAsync...');
       databaseFactory = databaseFactoryFfi;
       SharedPreferences.setMockInitialValues({'onboarding_complete': true});
@@ -33,11 +33,14 @@ void main() {
 
       await tester.pump();
 
-      // Verify presence of AppBar text
-      expect(find.text('Hydrio Core'), findsOneWidget);
+      // Verify presence of AppBar text and Bottom Navigation Tab label
+      expect(find.text('Today'), findsNWidgets(2));
       
-      // Verify progress text renders target
-      expect(find.textContaining('Goal:'), findsOneWidget);
+      // Verify quick add section exists
+      expect(find.text('Quick add'), findsOneWidget);
+
+      // Verify add water button exists
+      expect(find.text('Add Water'), findsOneWidget);
       print('WIDGET TEST 1: Passed!');
     });
 
@@ -124,8 +127,8 @@ void main() {
       });
       await tester.pumpAndSettle();
 
-      // Verify we are redirected to Hydrio Core
-      expect(find.text('Hydrio Core'), findsOneWidget);
+      // Verify we are redirected to Today screen and tab label exists
+      expect(find.text('Today'), findsNWidgets(2));
       expect(provider.settings.onboardingComplete, isTrue);
 
       print('WIDGET TEST 3: Passed!');
