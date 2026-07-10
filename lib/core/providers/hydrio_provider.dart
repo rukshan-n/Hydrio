@@ -301,12 +301,24 @@ class HydrioProvider with ChangeNotifier {
     if (_settings.unit == 'oz') {
       return '${toOz(amountMl).toStringAsFixed(1)} fl oz';
     }
+    if (_settings.unit == 'l') {
+      final double l = amountMl / 1000.0;
+      if (l == l.toInt()) {
+        return '${l.toStringAsFixed(0)} L';
+      } else if ((l * 10) == (l * 10).toInt()) {
+        return '${l.toStringAsFixed(1)} L';
+      } else {
+        return '${l.toStringAsFixed(2)} L';
+      }
+    }
     return '$amountMl ml';
   }
 
   /// Get unit suffix
   String get unitSuffix {
-    return _settings.unit == 'oz' ? 'fl oz' : 'ml';
+    if (_settings.unit == 'oz') return 'fl oz';
+    if (_settings.unit == 'l') return 'L';
+    return 'ml';
   }  /// Retrieves aggregated data for the history screen based on the selected period.
   HistoryPeriodData getHistoryData(String period) {
     final now = DateTime.now();
@@ -578,6 +590,12 @@ class HydrioProvider with ChangeNotifier {
     _settings = HydrioSettings.defaultSettings();
     await _prefs.clear();
     await initialize();
+  }
+
+  Future<void> clearHistoryOnly() async {
+    await _db.clearAllData();
+    await loadTodayData();
+    await loadHistoryData();
   }
 }
 

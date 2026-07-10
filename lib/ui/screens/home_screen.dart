@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'today_screen.dart';
 import 'history_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<Widget> pages = [
       TodayScreen(onSettingsTap: _navigateToSettings),
       const HistoryScreen(),
-      const PlaceholderScreen(title: 'Settings'),
+      const SettingsScreen(),
     ];
 
     return Scaffold(
