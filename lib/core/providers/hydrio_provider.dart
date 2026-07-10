@@ -31,6 +31,47 @@ class HydrioProvider with ChangeNotifier {
   DailySummary? get todaySummary => _todaySummary;
   bool get hasUndoItem => _lastDeletedLog != null;
 
+  /// Returns the user's weekly hydration level computed over a rolling 7-day window.
+  WeeklyHydrationLevel get weeklyHydrationLevel {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    double totalIntake = 0.0;
+    double totalTarget = 0.0;
+
+    for (int i = 6; i >= 0; i--) {
+      final date = today.subtract(Duration(days: i));
+      final dayKey = DateFormat('yyyy-MM-dd').format(date);
+
+      if (dayKey == todayKey) {
+        if (_todaySummary != null) {
+          totalIntake += _todaySummary!.totalMl;
+          totalTarget += _todaySummary!.targetMl;
+        } else {
+          totalTarget += calculatedDailyTarget;
+        }
+      } else {
+        final matches = _historySummaries.where((s) => s.dayKey == dayKey);
+        if (matches.isNotEmpty) {
+          totalIntake += matches.first.totalMl;
+          totalTarget += matches.first.targetMl;
+        }
+      }
+    }
+
+    if (totalTarget <= 0) {
+      return WeeklyHydrationLevel.mid;
+    }
+
+    final percentage = totalIntake / totalTarget;
+    if (percentage < 0.50) {
+      return WeeklyHydrationLevel.low;
+    } else if (percentage < 0.80) {
+      return WeeklyHydrationLevel.mid;
+    } else {
+      return WeeklyHydrationLevel.high;
+    }
+  }
+
   // Helper to get today's key format "YYYY-MM-DD"
   String get todayKey => DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -608,3 +649,6 @@ class ExportPeriodDataResult {
     required this.logs,
   });
 }
+
+enum WeeklyHydrationLevel { low, mid, high }
+

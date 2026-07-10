@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:hydrio/core/models/settings_model.dart';
 import 'package:hydrio/core/providers/hydrio_provider.dart';
+import 'package:hydrio/core/theme/app_colors.dart';
+import 'package:flutter/material.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -138,6 +140,43 @@ void main() {
 
       // Average intake should be totalMl (2500) / occurred days
       expect(historyData.averageIntake, 2500.0 / DateTime.now().weekday);
+    });
+
+    test('weeklyHydrationLevel rolling 7-day calculations and level transitions', () async {
+      databaseFactory = databaseFactoryFfi;
+      SharedPreferences.setMockInitialValues({'onboarding_complete': true, 'unit': 'ml'});
+      
+      final provider = HydrioProvider();
+      await provider.initialize();
+      await provider.resetAllData();
+
+      // 1. Initial State (No history logs. Today's intake is 0 mL).
+      // Rolling targets = 1 day (today's target of 2500). Intake = 0 mL.
+      // Percentage = 0% => WeeklyHydrationLevel.low.
+      expect(provider.weeklyHydrationLevel, WeeklyHydrationLevel.low);
+
+      // 2. Log full target water today (2500 mL)
+      await provider.logDrink(2500);
+      // Rolling targets = 1 day (today's target of 2500). Intake = 2500 mL.
+      // Percentage = 100% => WeeklyHydrationLevel.high.
+      expect(provider.weeklyHydrationLevel, WeeklyHydrationLevel.high);
+
+      // 3. Log smaller amount so it's in the mid range (50% to 79%)
+      // Let's reset all data and log 1500 mL instead.
+      await provider.resetAllData();
+      await provider.logDrink(1500);
+      // Percentage = 1500/2500 = 60% => WeeklyHydrationLevel.mid.
+      expect(provider.weeklyHydrationLevel, WeeklyHydrationLevel.mid);
+    });
+
+    test('AppPalette dynamic colors resolution matches hydration score', () {
+      expect(AppPalette.resolve(Brightness.light, WeeklyHydrationLevel.low).surface, const Color(0xFFD7C9BA));
+      expect(AppPalette.resolve(Brightness.light, WeeklyHydrationLevel.mid).surface, const Color(0xFFFFFFFF));
+      expect(AppPalette.resolve(Brightness.light, WeeklyHydrationLevel.high).surface, const Color(0xFFD9ECFA));
+      
+      expect(AppPalette.resolve(Brightness.dark, WeeklyHydrationLevel.low).surface, const Color(0xFF221711));
+      expect(AppPalette.resolve(Brightness.dark, WeeklyHydrationLevel.mid).surface, const Color(0xFF121821));
+      expect(AppPalette.resolve(Brightness.dark, WeeklyHydrationLevel.high).surface, const Color(0xFF0C1824));
     });
   });
 }

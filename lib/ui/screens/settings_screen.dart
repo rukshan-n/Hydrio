@@ -15,27 +15,25 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   // Common theme color references
   Color _getPanelColor(ThemeData theme) {
-    return theme.brightness == Brightness.light
+    return theme.cardTheme.color ?? (theme.brightness == Brightness.light
         ? const Color(0xffF2F5F8)
-        : const Color(0xff1B2430);
+        : const Color(0xff1B2430));
   }
 
   Color _getInkColor(ThemeData theme) {
-    return theme.brightness == Brightness.light
+    return theme.textTheme.bodyMedium?.color ?? (theme.brightness == Brightness.light
         ? const Color(0xff1F2933)
-        : const Color(0xffE8EDF2);
+        : const Color(0xffE8EDF2));
   }
 
   Color _getMutedColor(ThemeData theme) {
-    return theme.brightness == Brightness.light
+    return theme.textTheme.bodySmall?.color ?? (theme.brightness == Brightness.light
         ? const Color(0xff7B8794)
-        : const Color(0xff9AA5B1);
+        : const Color(0xff9AA5B1));
   }
 
   Color _getDangerColor(ThemeData theme) {
-    return theme.brightness == Brightness.light
-        ? const Color(0xffC5221F)
-        : const Color(0xffF08A86);
+    return theme.colorScheme.error;
   }
 
   // Recommendation calculator for automatic daily target

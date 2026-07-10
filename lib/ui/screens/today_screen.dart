@@ -242,7 +242,7 @@ class _QuickAddChip extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Material(
-      color: isDark ? const Color(0xff1B2430) : const Color(0xffF2F5F8),
+      color: theme.cardTheme.color ?? (isDark ? const Color(0xff1B2430) : const Color(0xffF2F5F8)),
       borderRadius: BorderRadius.circular(12.0),
       child: InkWell(
         onTap: onTap,

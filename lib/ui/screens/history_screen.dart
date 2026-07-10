@@ -287,7 +287,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   child: Container(
                     height: 54,
                     decoration: BoxDecoration(
-                      color: theme.brightness == Brightness.light ? Colors.white : const Color(0xff1B2430),
+                      color: theme.colorScheme.surface,
                       border: Border.all(
                         color: theme.colorScheme.onSurfaceVariant.withOpacity(0.15),
                         width: 1,
