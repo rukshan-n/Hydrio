@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/providers/hydrio_provider.dart';
 import 'add_water_screen.dart';
+import '../widgets/water_bowl.dart';
 
 class TodayScreen extends StatefulWidget {
   final VoidCallback onSettingsTap;
@@ -120,8 +121,8 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
             child: Column(
               children: [
                 const SizedBox(height: 16),
-                // Animated Circular Progress Ring
-                AnimatedProgressRing(
+                // Cool Animated Water Bowl
+                WaterBowl(
                   progress: percentage,
                   totalConsumed: totalConsumed,
                   dailyTarget: dailyTarget,
@@ -222,187 +223,7 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
   }
 }
 
-class AnimatedProgressRing extends StatefulWidget {
-  final double progress;
-  final int totalConsumed;
-  final int dailyTarget;
-  final String Function(int) formatVolume;
 
-  const AnimatedProgressRing({
-    super.key,
-    required this.progress,
-    required this.totalConsumed,
-    required this.dailyTarget,
-    required this.formatVolume,
-  });
-
-  @override
-  State<AnimatedProgressRing> createState() => _AnimatedProgressRingState();
-}
-
-class _AnimatedProgressRingState extends State<AnimatedProgressRing>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-  double _prevProgress = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _animation = Tween<double>(begin: 0.0, end: widget.progress).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-    _controller.forward();
-  }
-
-  @override
-  void didUpdateWidget(covariant AnimatedProgressRing oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.progress != widget.progress) {
-      _prevProgress = oldWidget.progress;
-      _animation = Tween<double>(begin: _prevProgress, end: widget.progress).animate(
-        CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-      );
-      _controller.reset();
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final disableAnimations = MediaQuery.of(context).disableAnimations;
-
-    final double displayProgress = disableAnimations ? widget.progress : widget.progress;
-
-    return Center(
-      child: AnimatedBuilder(
-        animation: _animation,
-        builder: (context, child) {
-          final ringProgress = disableAnimations ? widget.progress : _animation.value;
-          final displayPct = (widget.progress * 100).round();
-          
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 240,
-                height: 240,
-                child: CustomPaint(
-                  painter: _RingPainter(
-                    progress: ringProgress,
-                    primaryColor: theme.colorScheme.primary,
-                    trackColor: theme.brightness == Brightness.dark
-                        ? const Color(0xff173448)
-                        : const Color(0xffD6ECFB),
-                    successColor: theme.colorScheme.secondary, // Success Color
-                  ),
-                ),
-              ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$displayPct%',
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${widget.formatVolume(widget.totalConsumed)} / ${widget.formatVolume(widget.dailyTarget)}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _RingPainter extends CustomPainter {
-  final double progress;
-  final Color primaryColor;
-  final Color trackColor;
-  final Color successColor;
-
-  _RingPainter({
-    required this.progress,
-    required this.primaryColor,
-    required this.trackColor,
-    required this.successColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - 20) / 2;
-    const strokeWidth = 20.0;
-
-    // Draw background track
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(center, radius, trackPaint);
-
-    // Draw active progress ring arc
-    final activePaint = Paint()
-      ..color = progress >= 1.0 ? successColor : primaryColor
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = strokeWidth;
-
-    // Determine sweep angle
-    // Cap visual progress at 1.0 but support overflow animation values
-    final double visualProgress = progress.clamp(0.0, 1.0);
-    final double sweepAngle = 2 * 3.1415926535 * visualProgress;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -3.1415926535 / 2, // Start at 12 o'clock
-      sweepAngle,
-      false,
-      activePaint,
-    );
-
-    // Draw an extra glow/halo ring if there is an overflow (>100%)
-    if (progress > 1.0) {
-      final glowPaint = Paint()
-        ..color = successColor.withOpacity(0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4.0;
-      canvas.drawCircle(center, radius + strokeWidth / 2 + 6, glowPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RingPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.trackColor != trackColor ||
-        oldDelegate.successColor != successColor;
-  }
-}
 
 class _QuickAddChip extends StatelessWidget {
   final int amount;
