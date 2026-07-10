@@ -5,6 +5,7 @@ import 'package:hydrio/core/providers/hydrio_provider.dart';
 import 'package:hydrio/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:hydrio/ui/screens/add_water_screen.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -129,6 +130,111 @@ void main() {
       expect(provider.settings.onboardingComplete, isTrue);
 
       print('WIDGET TEST 3: Passed!');
+    });
+
+    testWidgets('AddWaterScreen presets log immediately and pop', (WidgetTester tester) async {
+      print('WIDGET TEST 4: Starting in runAsync...');
+      databaseFactory = databaseFactoryFfi;
+      SharedPreferences.setMockInitialValues({'onboarding_complete': true});
+      final provider = HydrioProvider();
+      await tester.runAsync(() async {
+        await provider.initialize();
+      });
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HydrioProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: AddWaterScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // Verify chips exist
+      expect(find.text('100 mL'), findsOneWidget);
+      expect(find.text('200 mL'), findsOneWidget);
+      expect(find.text('250 mL'), findsOneWidget);
+      expect(find.text('500 mL'), findsOneWidget);
+      expect(find.text('Bottle'), findsOneWidget);
+      expect(find.text('Custom'), findsOneWidget);
+
+      // Tap 100 mL preset chip
+      await tester.runAsync(() async {
+        await tester.tap(find.text('100 mL'));
+        await Future.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+
+      // Check if logged successfully
+      expect(provider.todayLogs.last.amountMl, 100);
+      print('WIDGET TEST 4: Passed!');
+    });
+
+    testWidgets('AddWaterScreen custom amount validation logic', (WidgetTester tester) async {
+      print('WIDGET TEST 5: Starting in runAsync...');
+      databaseFactory = databaseFactoryFfi;
+      SharedPreferences.setMockInitialValues({'onboarding_complete': true});
+      final provider = HydrioProvider();
+      await tester.runAsync(() async {
+        await provider.initialize();
+      });
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HydrioProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: AddWaterScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // Tap Custom chip
+      await tester.tap(find.text('Custom'));
+      await tester.pumpAndSettle();
+
+      // Custom numeric input field should be visible
+      expect(find.byType(TextField), findsOneWidget);
+
+      // Button should be disabled because field is empty/invalid initially
+      final Finder addBtnFinder = find.widgetWithText(ElevatedButton, 'Add');
+      ElevatedButton addBtn = tester.widget<ElevatedButton>(addBtnFinder);
+      expect(addBtn.onPressed, isNull);
+
+      // Enter zero
+      await tester.enterText(find.byType(TextField), '0');
+      await tester.pumpAndSettle();
+      addBtn = tester.widget<ElevatedButton>(addBtnFinder);
+      expect(addBtn.onPressed, isNull);
+      expect(find.text('Please enter a positive number'), findsOneWidget);
+
+      // Enter out-of-range value 2500 mL
+      await tester.enterText(find.byType(TextField), '2500');
+      await tester.pumpAndSettle();
+      addBtn = tester.widget<ElevatedButton>(addBtnFinder);
+      expect(addBtn.onPressed, isNull);
+      expect(find.text('Amount must be between 1 and 2000 ml'), findsOneWidget);
+
+      // Enter valid custom value 350 mL
+      await tester.enterText(find.byType(TextField), '350');
+      await tester.pumpAndSettle();
+      addBtn = tester.widget<ElevatedButton>(addBtnFinder);
+      expect(addBtn.onPressed, isNotNull);
+
+      // Tap the Add button
+      await tester.runAsync(() async {
+        await tester.ensureVisible(addBtnFinder);
+        await tester.tap(addBtnFinder);
+        await Future.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+
+      // Check if custom amount logged successfully
+      expect(provider.todayLogs.last.amountMl, 350);
+      print('WIDGET TEST 5: Passed!');
     });
   });
 }
