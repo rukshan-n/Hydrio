@@ -1,7 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:hydrio/core/models/settings_model.dart';
+import 'package:hydrio/core/providers/hydrio_provider.dart';
 
 void main() {
+  sqfliteFfiInit();
   group('Hydrio Data Models & Settings Tests', () {
     test('defaultSettings factory has expected defaults', () {
       final settings = HydrioSettings.defaultSettings();
@@ -102,6 +106,38 @@ void main() {
 
       expect(toOz(1000).toStringAsFixed(1), '33.8');
       expect(toMl(33.814), 1000);
+    });
+
+    test('getHistoryData weekly backfilling and aggregation works correctly', () async {
+      databaseFactory = databaseFactoryFfi;
+      SharedPreferences.setMockInitialValues({'onboarding_complete': true, 'unit': 'ml'});
+      
+      final provider = HydrioProvider();
+      await provider.initialize();
+      await provider.resetAllData();
+
+      // Log a drink today (e.g. 2500 mL to achieve goal)
+      await provider.logDrink(2500);
+
+      // Get history data for weekly range
+      final historyData = provider.getHistoryData('weekly');
+
+      // Weekly range should have 7 bars (Monday to Sunday)
+      expect(historyData.chartBars.length, 7);
+
+      // Today should be success (since logged 2500 mL >= target 2500 mL)
+      // The day index of today in Monday-Sunday range is: DateTime.now().weekday - 1
+      final todayIndex = DateTime.now().weekday - 1;
+      expect(historyData.chartBars[todayIndex].isSuccess, isTrue);
+      expect(historyData.chartBars[todayIndex].value, 2500.0);
+
+      // Other occurred days (before today) should be virtual missed (since we reset DB)
+      // The number of occurred days is DateTime.now().weekday
+      expect(historyData.successCount, 1);
+      expect(historyData.missedCount, DateTime.now().weekday - 1);
+
+      // Average intake should be totalMl (2500) / occurred days
+      expect(historyData.averageIntake, 2500.0 / DateTime.now().weekday);
     });
   });
 }

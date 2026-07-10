@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/settings_model.dart';
 import '../models/drink_log_model.dart';
 import '../models/daily_summary_model.dart';
+import '../models/history_data_model.dart';
 import '../database/db_helper.dart';
 import '../notifications/notification_service.dart';
 import '../utils/export_helper.dart';
@@ -305,6 +306,202 @@ class HydrioProvider with ChangeNotifier {
   /// Get unit suffix
   String get unitSuffix {
     return _settings.unit == 'oz' ? 'fl oz' : 'ml';
+  }  /// Retrieves aggregated data for the history screen based on the selected period.
+  HistoryPeriodData getHistoryData(String period) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = calculatedDailyTarget.toDouble();
+
+    if (period.toLowerCase() == 'daily') {
+      // 1. Daily View (Today)
+      final List<ChartBarItem> bars = [];
+
+      // Group into 2-hour slots: 02:00, 04:00, ..., 24:00 (12 slots)
+      for (int h = 2; h <= 24; h += 2) {
+        double slotSum = 0.0;
+        for (final log in _todayLogs) {
+          final time = DateTime.fromMillisecondsSinceEpoch(log.timestamp);
+          if (time.hour < h) {
+            slotSum += log.amountMl;
+          }
+        }
+        final label = h.toString().padLeft(2, '0');
+        final isSuccess = slotSum >= target;
+        final formattedVal = formatVolume(slotSum.toInt());
+        final tooltip = 'Up to $label:00: $formattedVal';
+
+        bars.add(ChartBarItem(
+          label: label,
+          value: slotSum,
+          isSuccess: isSuccess,
+          tooltipText: tooltip,
+          date: today,
+        ));
+      }
+
+      final successCount = _todaySummary?.status == 'success' ? 1 : 0;
+      final missedCount = _todaySummary?.status == 'missed' ? 1 : 0;
+      final averageIntake = _todaySummary?.totalMl.toDouble() ?? 0.0;
+
+      return HistoryPeriodData(
+        chartBars: bars,
+        successCount: successCount,
+        missedCount: missedCount,
+        averageIntake: averageIntake,
+        targetVolume: target,
+      );
+    } else if (period.toLowerCase() == 'weekly') {
+      // 2. Weekly View (Monday to Sunday)
+      final List<ChartBarItem> bars = [];
+      int successCount = 0;
+      int missedCount = 0;
+      double totalSum = 0.0;
+      int validDays = 0;
+
+      final monday = today.subtract(Duration(days: today.weekday - 1));
+      final weekdayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+      for (int i = 0; i < 7; i++) {
+        final date = monday.add(Duration(days: i));
+        final dayKey = DateFormat('yyyy-MM-dd').format(date);
+        final isFuture = date.isAfter(today);
+
+        double value = 0.0;
+        bool isSuccess = false;
+        String tooltip = '';
+
+        if (!isFuture) {
+          DailySummary? summary;
+          if (dayKey == todayKey) {
+            summary = _todaySummary;
+          } else {
+            final matches = _historySummaries.where((s) => s.dayKey == dayKey);
+            if (matches.isNotEmpty) {
+              summary = matches.first;
+            } else {
+              summary = DailySummary(
+                dayKey: dayKey,
+                targetMl: calculatedDailyTarget,
+                totalMl: 0,
+                completionPct: 0.0,
+                status: 'missed',
+              );
+            }
+          }
+
+          if (summary != null) {
+            value = summary.totalMl.toDouble();
+            isSuccess = summary.status == 'success';
+            if (isSuccess) {
+              successCount++;
+            } else {
+              missedCount++;
+            }
+            totalSum += value;
+            validDays++;
+            final formattedVal = formatVolume(summary.totalMl);
+            final formattedPct = (summary.completionPct * 100).toStringAsFixed(0);
+            tooltip = '${DateFormat('MMM d').format(date)}: $formattedVal ($formattedPct%)';
+          }
+        } else {
+          tooltip = '${DateFormat('MMM d').format(date)}: -';
+        }
+
+        bars.add(ChartBarItem(
+          label: weekdayLabels[i],
+          value: value,
+          isSuccess: isSuccess,
+          tooltipText: tooltip,
+          date: date,
+        ));
+      }
+
+      final averageIntake = validDays > 0 ? totalSum / validDays : 0.0;
+
+      return HistoryPeriodData(
+        chartBars: bars,
+        successCount: successCount,
+        missedCount: missedCount,
+        averageIntake: averageIntake,
+        targetVolume: target,
+      );
+    } else {
+      // 3. Monthly View (1st to last day of month)
+      final List<ChartBarItem> bars = [];
+      int successCount = 0;
+      int missedCount = 0;
+      double totalSum = 0.0;
+      int validDays = 0;
+
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final lastOfMonth = DateTime(now.year, now.month + 1, 0);
+      final daysInMonth = lastOfMonth.day;
+
+      for (int i = 1; i <= daysInMonth; i++) {
+        final date = DateTime(now.year, now.month, i);
+        final dayKey = DateFormat('yyyy-MM-dd').format(date);
+        final isFuture = date.isAfter(today);
+
+        double value = 0.0;
+        bool isSuccess = false;
+        String tooltip = '';
+
+        if (!isFuture) {
+          DailySummary? summary;
+          if (dayKey == todayKey) {
+            summary = _todaySummary;
+          } else {
+            final matches = _historySummaries.where((s) => s.dayKey == dayKey);
+            if (matches.isNotEmpty) {
+              summary = matches.first;
+            } else {
+              summary = DailySummary(
+                dayKey: dayKey,
+                targetMl: calculatedDailyTarget,
+                totalMl: 0,
+                completionPct: 0.0,
+                status: 'missed',
+              );
+            }
+          }
+
+          if (summary != null) {
+            value = summary.totalMl.toDouble();
+            isSuccess = summary.status == 'success';
+            if (isSuccess) {
+              successCount++;
+            } else {
+              missedCount++;
+            }
+            totalSum += value;
+            validDays++;
+            final formattedVal = formatVolume(summary.totalMl);
+            final formattedPct = (summary.completionPct * 100).toStringAsFixed(0);
+            tooltip = '${DateFormat('MMM d').format(date)}: $formattedVal ($formattedPct%)';
+          }
+        } else {
+          tooltip = '${DateFormat('MMM d').format(date)}: -';
+        }
+
+        bars.add(ChartBarItem(
+          label: i.toString(),
+          value: value,
+          isSuccess: isSuccess,
+          tooltipText: tooltip,
+          date: date,
+        ));
+      }
+
+      final averageIntake = validDays > 0 ? totalSum / validDays : 0.0;
+
+      return HistoryPeriodData(
+        chartBars: bars,
+        successCount: successCount,
+        missedCount: missedCount,
+        averageIntake: averageIntake,
+        targetVolume: target,
+      );
+    }
   }
 
   // --- Export Actions ---
@@ -314,6 +511,47 @@ class HydrioProvider with ChangeNotifier {
     await ExportHelper.shareCsvExport(
       summaries: _historySummaries,
       logs: _allHistoryLogs,
+      unit: _settings.unit,
+      subjectEmail: _settings.exportEmail,
+    );
+  }
+
+  Future<void> exportPeriodData(String period) async {
+    await loadHistoryData();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    DateTime startDate;
+
+    if (period.toLowerCase() == 'daily') {
+      startDate = today;
+    } else if (period.toLowerCase() == 'weekly') {
+      startDate = today.subtract(Duration(days: today.weekday - 1));
+    } else {
+      startDate = DateTime(now.year, now.month, 1);
+    }
+
+    final filteredSummaries = _historySummaries.where((s) {
+      final date = DateTime.tryParse(s.dayKey);
+      if (date == null) return false;
+      return !date.isBefore(startDate) && !date.isAfter(today);
+    }).toList();
+
+    // Make sure today's summary is included
+    if (_todaySummary != null && !filteredSummaries.any((s) => s.dayKey == todayKey)) {
+      filteredSummaries.add(_todaySummary!);
+    }
+    filteredSummaries.sort((a, b) => a.dayKey.compareTo(b.dayKey));
+
+    final filteredLogs = _allHistoryLogs.where((l) {
+      final time = DateTime.fromMillisecondsSinceEpoch(l.timestamp);
+      final date = DateTime(time.year, time.month, time.day);
+      return !date.isBefore(startDate) && !date.isAfter(today);
+    }).toList();
+    filteredLogs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    await ExportHelper.shareCsvExport(
+      summaries: filteredSummaries,
+      logs: filteredLogs,
       unit: _settings.unit,
       subjectEmail: _settings.exportEmail,
     );

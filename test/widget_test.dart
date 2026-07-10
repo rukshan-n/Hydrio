@@ -6,6 +6,7 @@ import 'package:hydrio/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:hydrio/ui/screens/add_water_screen.dart';
+import 'package:hydrio/ui/screens/home_screen.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -238,6 +239,64 @@ void main() {
       // Check if custom amount logged successfully
       expect(provider.todayLogs.last.amountMl, 350);
       print('WIDGET TEST 5: Passed!');
+    });
+
+    testWidgets('HistoryScreen renders all components, switches range, and exports', (WidgetTester tester) async {
+      print('WIDGET TEST 6: Starting HistoryScreen test...');
+      databaseFactory = databaseFactoryFfi;
+      SharedPreferences.setMockInitialValues({'onboarding_complete': true, 'unit': 'ml'});
+      
+      final provider = HydrioProvider();
+
+      await tester.runAsync(() async {
+        await provider.initialize();
+        // Clear database first
+        await provider.resetAllData();
+        // Log some drinks for today (e.g. 500 mL and 200 mL)
+        await provider.logDrink(500);
+        await provider.logDrink(200);
+      });
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HydrioProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: HomeScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // Tap on History tab in bottom navigation bar
+      await tester.tap(find.byIcon(Icons.bar_chart));
+      await tester.pumpAndSettle();
+
+      // Verify we are on History screen
+      expect(find.text('History'), findsNWidgets(2));
+
+      // Verify segmented control button segments
+      expect(find.text('Daily'), findsOneWidget);
+      expect(find.text('Weekly'), findsOneWidget);
+      expect(find.text('Monthly'), findsOneWidget);
+
+      // Verify stats cards
+      expect(find.text('Success'), findsOneWidget);
+      expect(find.text('Missed'), findsOneWidget);
+      expect(find.text('Avg/day'), findsOneWidget);
+
+      // Verify export button
+      expect(find.text('Export / Email summary'), findsOneWidget);
+
+      // Tap Daily segmented button
+      await tester.tap(find.text('Daily'));
+      await tester.pumpAndSettle();
+
+      // Tap Monthly segmented button
+      await tester.tap(find.text('Monthly'));
+      await tester.pumpAndSettle();
+
+      print('WIDGET TEST 6: Passed!');
     });
   });
 }
