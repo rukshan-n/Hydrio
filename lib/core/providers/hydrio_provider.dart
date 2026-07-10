@@ -27,6 +27,7 @@ class HydrioProvider with ChangeNotifier {
   HydrioSettings get settings => _settings;
   List<DrinkLog> get todayLogs => _todayLogs;
   List<DailySummary> get historySummaries => _historySummaries;
+  List<DrinkLog> get allHistoryLogs => _allHistoryLogs;
   DailySummary? get todaySummary => _todaySummary;
   bool get hasUndoItem => _lastDeletedLog != null;
 
@@ -517,6 +518,16 @@ class HydrioProvider with ChangeNotifier {
   }
 
   Future<void> exportPeriodData(String period) async {
+    final data = await getPeriodData(period);
+    await ExportHelper.shareCsvExport(
+      summaries: data.summaries,
+      logs: data.logs,
+      unit: _settings.unit,
+      subjectEmail: _settings.exportEmail,
+    );
+  }
+
+  Future<ExportPeriodDataResult> getPeriodData(String period) async {
     await loadHistoryData();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -549,12 +560,15 @@ class HydrioProvider with ChangeNotifier {
     }).toList();
     filteredLogs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-    await ExportHelper.shareCsvExport(
+    return ExportPeriodDataResult(
       summaries: filteredSummaries,
       logs: filteredLogs,
-      unit: _settings.unit,
-      subjectEmail: _settings.exportEmail,
     );
+  }
+
+  Future<void> updateExportEmail(String email) async {
+    final updated = _settings.copyWith(exportEmail: email);
+    await updateSettings(updated);
   }
 
   // --- System Maintenance ---
@@ -565,4 +579,14 @@ class HydrioProvider with ChangeNotifier {
     await _prefs.clear();
     await initialize();
   }
+}
+
+class ExportPeriodDataResult {
+  final List<DailySummary> summaries;
+  final List<DrinkLog> logs;
+
+  ExportPeriodDataResult({
+    required this.summaries,
+    required this.logs,
+  });
 }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/providers/hydrio_provider.dart';
 import '../../core/models/history_data_model.dart';
+import 'export_summary_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -273,27 +274,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                 // Export Button
                 GestureDetector(
-                  onTap: () async {
-                    try {
-                      await provider.exportPeriodData(_selectedPeriod);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Export shared successfully! 📊'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Failed to export: $e ⚠️'),
-                            backgroundColor: theme.colorScheme.error,
-                          ),
-                        );
-                      }
-                    }
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ExportSummaryScreen(
+                          initialPeriod: _selectedPeriod,
+                        ),
+                      ),
+                    );
                   },
                   child: Container(
                     height: 54,

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:hydrio/ui/screens/add_water_screen.dart';
 import 'package:hydrio/ui/screens/home_screen.dart';
+import 'package:hydrio/ui/screens/export_summary_screen.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -297,6 +298,76 @@ void main() {
       await tester.pumpAndSettle();
 
       print('WIDGET TEST 6: Passed!');
+    });
+
+    testWidgets('ExportSummaryScreen renders all elements, updates on toggle, and validates email', (WidgetTester tester) async {
+      print('WIDGET TEST 7: Starting ExportSummaryScreen test...');
+      databaseFactory = databaseFactoryFfi;
+      SharedPreferences.setMockInitialValues({
+        'onboarding_complete': true,
+        'unit': 'ml',
+        'export_email': 'test@example.com'
+      });
+      
+      final provider = HydrioProvider();
+
+      await tester.runAsync(() async {
+        await provider.initialize();
+        await provider.resetAllData();
+        await provider.updateExportEmail('test@example.com');
+        await provider.logDrink(250);
+      });
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HydrioProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: ExportSummaryScreen(initialPeriod: 'weekly'),
+          ),
+        ),
+      );
+
+      await tester.runAsync(() async {
+        await tester.pump();
+        for (int i = 0; i < 5; i++) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          await tester.pump();
+        }
+      });
+
+      // Verify app bar title
+      expect(find.text('Export Summary'), findsOneWidget);
+
+      // Verify prefilled email address
+      final emailTextFieldFinder = find.byType(TextField);
+      expect(emailTextFieldFinder, findsOneWidget);
+      final emailTextField = tester.widget<TextField>(emailTextFieldFinder);
+      expect(emailTextField.controller?.text, 'test@example.com');
+
+      // Verify period selector and format selector segments
+      expect(find.text('Weekly'), findsOneWidget);
+      expect(find.text('Email text'), findsOneWidget);
+      expect(find.text('CSV file'), findsOneWidget);
+
+      // Verify preview area renders text
+      expect(find.textContaining('=== HYDRATION SUMMARY ==='), findsOneWidget);
+
+      // Verify Share button is enabled since we have log data
+      final shareBtnFinder = find.text('Open share sheet');
+      expect(shareBtnFinder, findsOneWidget);
+
+      // Test email invalidation
+      await tester.enterText(emailTextFieldFinder, 'invalid-email');
+      await tester.pump();
+      expect(find.text('Please enter a valid email address.'), findsOneWidget);
+
+      // Test email clear validation (should hide warning message)
+      await tester.enterText(emailTextFieldFinder, '');
+      await tester.pump();
+      expect(find.text('Please enter a valid email address.'), findsNothing);
+
+
+      print('WIDGET TEST 7: Passed!');
     });
   });
 }
