@@ -17,6 +17,7 @@ void main() {
       expect(settings.notificationsOn, true);
       expect(settings.silentReminders, false);
       expect(settings.theme, 'system');
+      expect(settings.onboardingComplete, false);
     });
 
     test('fromMap & toMap serialization consistency', () {
@@ -30,6 +31,7 @@ void main() {
         unit: 'oz',
         notificationsOn: false,
         silentReminders: true,
+        onboardingComplete: true,
       );
 
       final map = original.toMap();
@@ -44,6 +46,7 @@ void main() {
       expect(reconstructed.unit, original.unit);
       expect(reconstructed.notificationsOn, original.notificationsOn);
       expect(reconstructed.silentReminders, original.silentReminders);
+      expect(reconstructed.onboardingComplete, original.onboardingComplete);
     });
 
     test('calculatedDailyTarget calculations are correct based on demographics', () {

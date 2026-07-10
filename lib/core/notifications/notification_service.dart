@@ -96,11 +96,13 @@ class NotificationService {
 
   /// Cancel all scheduled reminders
   Future<void> cancelAllReminders() async {
+    if (!_initialized) return;
     await _localNotifications.cancelAll();
   }
 
   /// Schedule window-aware reminders for the next 3 days
   Future<void> scheduleWindowReminders(HydrioSettings settings) async {
+    if (!_initialized) return;
     // Always clear existing reminders first to avoid overlap/duplication
     await cancelAllReminders();
 

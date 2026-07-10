@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/providers/hydrio_provider.dart';
 import 'core/theme/theme.dart';
+import 'ui/screens/welcome_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,8 +59,27 @@ class HydrioApp extends StatelessWidget {
       theme: HydrioTheme.lightTheme,
       darkTheme: HydrioTheme.darkTheme,
       themeMode: themeMode,
-      home: const HydrioPlaceholderHome(),
+      home: const HydrioGateway(),
     );
+  }
+}
+
+/// A gateway widget that dynamically displays either the WelcomeScreen or the
+/// home dashboard depending on whether onboarding has been completed.
+class HydrioGateway extends StatelessWidget {
+  const HydrioGateway({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final onboardingComplete = context.select<HydrioProvider, bool>(
+      (p) => p.settings.onboardingComplete,
+    );
+
+    if (onboardingComplete) {
+      return const HydrioPlaceholderHome();
+    } else {
+      return const WelcomeScreen();
+    }
   }
 }
 
