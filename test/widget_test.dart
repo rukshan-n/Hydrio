@@ -35,6 +35,8 @@ void main() {
       );
 
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2600));
+      await tester.pumpAndSettle();
 
       // Verify presence of AppBar text and Bottom Navigation Tab label
       expect(find.text('Today'), findsNWidgets(2));
@@ -67,6 +69,8 @@ void main() {
       );
 
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2600));
+      await tester.pumpAndSettle();
 
       // Verify presence of branding and text elements
       expect(find.text('Hydrio'), findsOneWidget);
@@ -98,6 +102,8 @@ void main() {
       );
 
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2600));
+      await tester.pumpAndSettle();
 
       // Tap Get Started
       await tester.tap(find.text('Get Started'));

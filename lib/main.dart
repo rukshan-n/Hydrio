@@ -6,6 +6,7 @@ import 'core/providers/hydrio_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'ui/screens/welcome_screen.dart';
 import 'ui/screens/home_screen.dart';
+import 'ui/screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,7 +61,7 @@ class HydrioApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
-      home: const HydrioGateway(),
+      home: const SplashScreen(),
     );
   }
 }
