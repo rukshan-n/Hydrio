@@ -1,0 +1,320 @@
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import '../models/settings_model.dart';
+import '../models/drink_log_model.dart';
+import '../models/daily_summary_model.dart';
+import '../database/db_helper.dart';
+import '../notifications/notification_service.dart';
+import '../utils/export_helper.dart';
+
+class HydrioProvider with ChangeNotifier {
+  final DbHelper _db = DbHelper.instance;
+  late SharedPreferences _prefs;
+
+  // State Variables
+  HydrioSettings _settings = HydrioSettings.defaultSettings();
+  List<DrinkLog> _todayLogs = [];
+  List<DailySummary> _historySummaries = [];
+  List<DrinkLog> _allHistoryLogs = [];
+  DailySummary? _todaySummary;
+
+  // Undo Delete State
+  DrinkLog? _lastDeletedLog;
+
+  // Getters
+  HydrioSettings get settings => _settings;
+  List<DrinkLog> get todayLogs => _todayLogs;
+  List<DailySummary> get historySummaries => _historySummaries;
+  DailySummary? get todaySummary => _todaySummary;
+  bool get hasUndoItem => _lastDeletedLog != null;
+
+  // Helper to get today's key format "YYYY-MM-DD"
+  String get todayKey => DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+  /// Initialize state from local databases and SharedPreferences
+  Future<void> initialize() async {
+    _prefs = await SharedPreferences.getInstance();
+    await _loadSettingsFromPrefs();
+    await loadTodayData();
+    await loadHistoryData();
+  }
+
+  // --- Settings Persistence ---
+
+  Future<void> _loadSettingsFromPrefs() async {
+    try {
+      final gender = _prefs.getString('gender') ?? 'Other';
+      final age = _prefs.getInt('age') ?? 30;
+      final wakeTime = _prefs.getString('wake_time') ?? '07:00';
+      final sleepTime = _prefs.getString('sleep_time') ?? '22:00';
+      final reminderInterval = _prefs.getInt('reminder_interval_min') ?? 120;
+      final cupSize = _prefs.getInt('cup_size_ml') ?? 250;
+      final dailyTarget = _prefs.getInt('daily_target_ml') ?? 2000;
+      final manualOverride = _prefs.getBool('manual_override') ?? false;
+      final unit = _prefs.getString('unit') ?? 'ml';
+      final notificationsOn = _prefs.getBool('notifications_on') ?? true;
+      final silentReminders = _prefs.getBool('silent_reminders') ?? false;
+      final exportEmail = _prefs.getString('export_email') ?? '';
+      final theme = _prefs.getString('theme') ?? 'system';
+
+      _settings = HydrioSettings(
+        gender: gender,
+        age: age,
+        wakeTime: wakeTime,
+        sleepTime: sleepTime,
+        reminderIntervalMin: reminderInterval,
+        cupSizeMl: cupSize,
+        dailyTargetMl: dailyTarget,
+        manualOverride: manualOverride,
+        unit: unit,
+        notificationsOn: notificationsOn,
+        silentReminders: silentReminders,
+        exportEmail: exportEmail,
+        theme: theme,
+      );
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading settings from SharedPreferences: $e');
+      }
+    }
+  }
+
+  Future<void> updateSettings(HydrioSettings newSettings) async {
+    _settings = newSettings;
+    notifyListeners();
+
+    // Persist to SharedPreferences
+    await _prefs.setString('gender', _settings.gender);
+    await _prefs.setInt('age', _settings.age);
+    await _prefs.setString('wake_time', _settings.wakeTime);
+    await _prefs.setString('sleep_time', _settings.sleepTime);
+    await _prefs.setInt('reminder_interval_min', _settings.reminderIntervalMin);
+    await _prefs.setInt('cup_size_ml', _settings.cupSizeMl);
+    await _prefs.setInt('daily_target_ml', _settings.dailyTargetMl);
+    await _prefs.setBool('manual_override', _settings.manualOverride);
+    await _prefs.setString('unit', _settings.unit);
+    await _prefs.setBool('notifications_on', _settings.notificationsOn);
+    await _prefs.setBool('silent_reminders', _settings.silentReminders);
+    await _prefs.setString('export_email', _settings.exportEmail);
+    await _prefs.setString('theme', _settings.theme);
+
+    // Whenever settings are updated, recalculate/re-schedule notifications
+    await NotificationService.instance.scheduleWindowReminders(_settings);
+
+    // Also update today's daily target in database if it changed
+    await _syncTodaySummary();
+  }
+
+  /// Calculates dynamic daily water target if manual override is disabled.
+  int get calculatedDailyTarget {
+    if (_settings.manualOverride) {
+      return _settings.dailyTargetMl;
+    }
+
+    // Recommendation logic:
+    // Standard guideline: Females: ~2000ml, Males: ~3000ml, Other/Default: ~2500ml
+    // Age adjustments:
+    // Younger adults (< 30) have higher metabolic rate (+100ml)
+    // Older adults (> 55) require slightly less fluid baseline (-100ml)
+    int baseline = 2500;
+    if (_settings.gender.toLowerCase() == 'female') {
+      baseline = 2000;
+    } else if (_settings.gender.toLowerCase() == 'male') {
+      baseline = 3000;
+    }
+
+    if (_settings.age < 30) {
+      baseline += 100;
+    } else if (_settings.age > 55) {
+      baseline -= 100;
+    }
+
+    return baseline;
+  }
+
+  // --- Data Loading ---
+
+  Future<void> loadTodayData() async {
+    final key = todayKey;
+    _todayLogs = await _db.getDrinkLogsForDay(key);
+
+    final summary = await _db.getDailySummary(key);
+    if (summary != null) {
+      _todaySummary = summary;
+    } else {
+      // Initialize today's summary in SQLite if missing
+      final target = calculatedDailyTarget;
+      _todaySummary = DailySummary(
+        dayKey: key,
+        targetMl: target,
+        totalMl: 0,
+        completionPct: 0.0,
+        status: 'missed', // default status
+      );
+      await _db.upsertDailySummary(_todaySummary!);
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadHistoryData() async {
+    _historySummaries = await _db.getAllDailySummaries();
+    _allHistoryLogs = await _db.getAllDrinkLogs();
+    notifyListeners();
+  }
+
+  // --- Drink Log Actions ---
+
+  /// Logs a drink with a given volume. If null, logs default cup size.
+  Future<void> logDrink([int? amountMl]) async {
+    final logAmount = amountMl ?? _settings.cupSizeMl;
+    final log = DrinkLog(
+      amountMl: logAmount,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      dayKey: todayKey,
+    );
+
+    await _db.insertDrinkLog(log);
+    await _syncTodaySummary();
+    await loadHistoryData();
+
+    // After logging a drink, we can reschedule alarms to shift reminders out.
+    await NotificationService.instance.scheduleWindowReminders(_settings);
+  }
+
+  /// Deletes a logged drink and updates the summary (supporting undo state).
+  Future<void> deleteDrink(int id) async {
+    // Find the log in our current cache
+    final index = _todayLogs.indexWhere((element) => element.id == id);
+    if (index != -1) {
+      _lastDeletedLog = _todayLogs[index];
+    }
+
+    await _db.deleteDrinkLog(id);
+    await _syncTodaySummary();
+    await loadHistoryData();
+
+    // Reschedule alerts since logs have been altered
+    await NotificationService.instance.scheduleWindowReminders(_settings);
+  }
+
+  /// Restores the last deleted drink log.
+  Future<void> undoDelete() async {
+    if (_lastDeletedLog == null) return;
+
+    final logToRestore = DrinkLog(
+      amountMl: _lastDeletedLog!.amountMl,
+      timestamp: _lastDeletedLog!.timestamp,
+      dayKey: _lastDeletedLog!.dayKey,
+    );
+
+    await _db.insertDrinkLog(logToRestore);
+    _lastDeletedLog = null; // Clear undo cache
+
+    await _syncTodaySummary();
+    await loadHistoryData();
+
+    await NotificationService.instance.scheduleWindowReminders(_settings);
+  }
+
+  /// Clears the undo delete cache state
+  void clearUndoCache() {
+    _lastDeletedLog = null;
+    notifyListeners();
+  }
+
+  // --- Internal Sync Logic ---
+
+  Future<void> _syncTodaySummary() async {
+    final key = todayKey;
+    final logs = await _db.getDrinkLogsForDay(key);
+    _todayLogs = logs;
+
+    final total = logs.fold<int>(0, (sum, log) => sum + log.amountMl);
+    final target = calculatedDailyTarget;
+    final pct = target > 0 ? (total / target) : 0.0;
+    // Status is 'success' if completed, 'missed' if incomplete
+    final status = total >= target ? 'success' : 'missed';
+
+    _todaySummary = DailySummary(
+      dayKey: key,
+      targetMl: target,
+      totalMl: total,
+      completionPct: pct > 1.0 ? 1.0 : pct,
+      status: status,
+    );
+
+    await _db.upsertDailySummary(_todaySummary!);
+    notifyListeners();
+  }
+
+  // --- Encouraging Tone Copy Generator ---
+
+  String get encouragingMessage {
+    if (_todaySummary == null) return "Let's start tracking your hydration today!";
+    final pct = _todaySummary!.completionPct;
+    final total = _todaySummary!.totalMl;
+    final target = _todaySummary!.targetMl;
+
+    if (total == 0) {
+      return "Let's start strong with your first glass of water today! 💧";
+    } else if (pct < 0.25) {
+      return "Good start! Every sip gets you closer to your goal. 🥤";
+    } else if (pct < 0.50) {
+      return "Great progress! You are moving steadily toward your target. 👍";
+    } else if (pct < 0.75) {
+      return "Over halfway there! You're doing a fantastic job today. ✨";
+    } else if (pct < 1.0) {
+      return "So close! Just a little more to meet your daily goal. You've got this! 🚀";
+    } else {
+      return "Goal achieved! Outstanding job keeping yourself hydrated today! 🎉";
+    }
+  }
+
+  // --- Unit Formatting Helpers ---
+
+  /// Convert ml to oz
+  double toOz(num ml) {
+    return ml * 0.033814;
+  }
+
+  /// Convert oz to ml
+  int toMl(num oz) {
+    return (oz / 0.033814).round();
+  }
+
+  /// Get formatted amount based on settings
+  String formatVolume(int amountMl) {
+    if (_settings.unit == 'oz') {
+      return '${toOz(amountMl).toStringAsFixed(1)} fl oz';
+    }
+    return '$amountMl ml';
+  }
+
+  /// Get unit suffix
+  String get unitSuffix {
+    return _settings.unit == 'oz' ? 'fl oz' : 'ml';
+  }
+
+  // --- Export Actions ---
+
+  Future<void> triggerCsvExport() async {
+    await loadHistoryData();
+    await ExportHelper.shareCsvExport(
+      summaries: _historySummaries,
+      logs: _allHistoryLogs,
+      unit: _settings.unit,
+      subjectEmail: _settings.exportEmail,
+    );
+  }
+
+  // --- System Maintenance ---
+
+  Future<void> resetAllData() async {
+    await _db.clearAllData();
+    _settings = HydrioSettings.defaultSettings();
+    await _prefs.clear();
+    await initialize();
+  }
+}
